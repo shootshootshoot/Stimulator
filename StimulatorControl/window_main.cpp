@@ -3,7 +3,8 @@
 
 #include<string>
 #include<vector>
-#include<array>>
+#include<array>
+#include<fstream>
 
 template<typename T>
 class ComPtr {
@@ -13,10 +14,25 @@ public:
 	~ComPtr() { if (ptr_) { ptr_->Release(); } }
 	T* operator->() { return ptr_; }
 	T** operator&() { return &ptr_; }
-	operator T*const*() { return &ptr_; }
 	operator T*() { return ptr_; }
 	operator void**() { return reinterpret_cast<void**>(&ptr_); }
 	void Release() { if (ptr_) { ptr_->Release(); ptr_ = nullptr; } }
+};
+
+class WaveWriter :protected std::ofstream {
+public:
+	WaveWriter(const char* file_name) :std::ofstream(file_name) { 
+		*this << "fixed" << std::endl;
+	}
+	WaveWriter& operator<<(std::vector<int> data) {
+		for (auto itr = data.begin(); itr != data.end(); itr++) {
+			*this << std::to_string(*itr) << std::endl;
+		}
+		return *this;
+	}
+	void release() {
+		this->close();
+	}
 };
 
 const float PI = 3.1415926534f;
@@ -28,47 +44,21 @@ enum WAVE_TYPE {
 	TRIANGLE
 };
 
+struct WaveParameter {
+	float amplitude;
+	int stride;
+	int offset;
+	int frequence;
+	WAVE_TYPE type;
+
+};
+
 class WaveGenerator {
 private:
-	unsigned index_;
+	WaveParameter parameter_;
 	std::vector<float> wave_data_;
 public:
-	WaveGenerator(unsigned amount_frame,unsigned index) 
-		:wave_data_(amount_frame), index_(index) {}
-	void Generate(unsigned offset, unsigned freq, float amplitude, WAVE_TYPE type) {
-		switch (type) {
-		case WAVE_TYPE::SIN:
-			for (auto i = 0u; i < wave_data_.size(); i++) {
-				wave_data_[i] = amplitude*sin(2.f*PI*static_cast<float>((i + offset) % freq) / static_cast<float>(freq));
-			}
-			break;
-		case WAVE_TYPE::SWATOOTH:
-			for (auto i = 0u; i < wave_data_.size(); i++) {
-				wave_data_[i] = amplitude*static_cast<float>((i + offset) % freq) / static_cast<float>(freq);
-			}break;
-		case WAVE_TYPE::TRIANGLE:
-			for (auto i = 0u; i < wave_data_.size(); i++) {
-				if ((i + offset) % freq < freq / 2u) {
-					wave_data_[i] = amplitude*static_cast<float>((i + offset) % freq) / static_cast<float>(freq / 2);
-				}
-				else {
-					wave_data_[i] = amplitude*(2.f - static_cast<float>((i + offset) % freq) / static_cast<float>(freq / 2));
-				}
-			}
-			break;
-		case WAVE_TYPE::SQUARE:
-			for (auto i = 0u; i < wave_data_.size(); i++) {
-				
-			}
-		
-		}
-	}
-	void Render() {
-		
-
-	}
-public:
-	const std::vector<float>& GetData() const { return wave_data_; }
+	
 };
 
 class PlexonStimulatorControl {
@@ -87,6 +77,8 @@ HRESULT PlexonStimulatorControl::Initialize() {
 
 	res = d2d_factory_->CreateHwndRenderTarget(D2D1::RenderTargetProperties(),
 		D2D1::HwndRenderTargetProperties(wnd_), &d2d_target_);
+
+	return S_OK;
 }
 
 
@@ -116,6 +108,11 @@ int __stdcall WinMain(HINSTANCE inst, HINSTANCE prev_inst, char* cmd_line, int c
 		if (!wnd)return -2;
 		ShowWindow(wnd, cmd_show);
 	}
+
+	std::vector<int> data(10, 100);
+	WaveWriter writer("test.txt");
+	writer << data;
+	writer.release();
 
 	MSG msg = {};
 	while (msg.message != WM_QUIT) {
